@@ -14,6 +14,7 @@ class Updater: ObservableObject {
     @Published var targetRelease: Release?
     @Published var progressBar: Double = 0
     @Published var updateState: UpdateAvailability = .notChecked
+    @Published var updateCheckDisabledMessage: String?
 
     @Published var changelog: [(title: String, body: [ChangelogNote])] = .init()
 
@@ -30,6 +31,7 @@ class Updater: ObservableObject {
         case notChecked
         case available
         case unavailable
+        case disabled
     }
 
     private var windowController: NSWindowController?
@@ -46,18 +48,36 @@ class Updater: ObservableObject {
         }
     }
 
-    init() {
-        self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
-            .autoconnect()
-            .sink { _ in
+    @Published var updatesEnabled: Bool = Defaults[.updatesEnabled] {
+        didSet {
+            Defaults[.updatesEnabled] = updatesEnabled
+            if updatesEnabled {
                 Task {
-                    await self.fetchLatestInfo()
+                    await fetchLatestInfo()
+                }
+            } else {
+                updateState = .disabled
+            }
+        }
+    }
 
-                    if self.updateState == .available {
-                        await self.showUpdateWindow()
+    init() {
+        // Only set up the timer if updates are enabled
+        if updatesEnabled {
+            self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    Task {
+                        await self.fetchLatestInfo()
+
+                        if self.updateState == .available {
+                            await self.showUpdateWindow()
+                        }
                     }
                 }
-            }
+        } else {
+            self.updateState = .disabled
+        }
     }
 
     func dismissWindow() {
@@ -67,11 +87,22 @@ class Updater: ObservableObject {
     }
 
     // Pulls the latest release information from GitHub and updates the app state accordingly.
-    func fetchLatestInfo() async {
+    func fetchLatestInfo(force: Bool = false) async {
+        // Early return if updates are disabled and not forcing
+        guard updatesEnabled || force else {
+            await MainActor.run {
+                targetRelease = nil
+                updateState = .disabled
+                updateCheckDisabledMessage = String(localized: "Updates are currently disabled via defaults")
+            }
+            return
+        }
+
         await MainActor.run {
             targetRelease = nil
             updateState = .notChecked
             progressBar = 0
+            updateCheckDisabledMessage = nil
         }
 
         let urlString = includeDevelopmentVersions ?

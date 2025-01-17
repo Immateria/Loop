@@ -21265,6 +21265,12 @@
         }
       }
     },
+    "Updates are currently disabled via defaults" : {
+
+    },
+    "Updates are disabled" : {
+
+    },
     "Use coordinates" : {
       "extractionState" : "manual",
       "localizations" : {

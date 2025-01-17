@@ -133,6 +133,11 @@ struct AboutConfigurationView: View {
     @StateObject private var model = AboutConfigurationModel()
     @ObservedObject private var updater = AppDelegate.updater
     @Default(.timesLooped) var timesLooped
+    @State private var isHoveringOverUpdateButton = false
+
+    var updateButtonEnabled: Bool {
+        isHoveringOverUpdateButton || updater.updatesEnabled
+    }
 
     var body: some View {
         LuminareSection {
@@ -176,15 +181,14 @@ struct AboutConfigurationView: View {
         LuminareSection {
             Button {
                 Task {
-                    await updater.fetchLatestInfo()
+                    // Pass force=true to bypass the guard check
+                    await updater.fetchLatestInfo(force: true)
 
                     if updater.updateState == .available {
                         await updater.showUpdateWindow()
                     } else {
-                        // Use getNextUpToDateText to get the next text
                         model.updateButtonTitle = model.getNextUpToDateText()
 
-                        // Reset the title after 2 seconds
                         let currentTitle = model.updateButtonTitle
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             if model.updateButtonTitle == currentTitle {
@@ -198,14 +202,36 @@ struct AboutConfigurationView: View {
                     .contentTransition(.numericText())
                     .animation(LuminareConstants.animation, value: model.updateButtonTitle)
             }
+            .disabled(!updateButtonEnabled)
+            .onHover { hovering in
+                isHoveringOverUpdateButton = hovering
+                if !updater.updatesEnabled {
+                    withAnimation(LuminareConstants.animation) {
+                        model.updateButtonTitle = hovering ?
+                            .init(localized: "Check for updates…") :
+                            .init(localized: "Updates are disabled")
+                    }
+                }
+            }
             .onAppear {
                 if updater.updateState == .available {
                     model.updateButtonTitle = .init(localized: "Update…")
+                } else if !updater.updatesEnabled {
+                    model.updateButtonTitle = .init(localized: "Updates are disabled")
                 }
             }
             .onChange(of: updater.updateState) { _ in
                 if updater.updateState == .available {
                     model.updateButtonTitle = .init(localized: "Update…")
+                }
+            }
+            .onChange(of: updater.updatesEnabled) { enabled in
+                withAnimation(LuminareConstants.animation) {
+                    if !enabled {
+                        model.updateButtonTitle = .init(localized: "Updates are disabled")
+                    } else {
+                        model.updateButtonTitle = .init(localized: "Check for updates…")
+                    }
                 }
             }
 
