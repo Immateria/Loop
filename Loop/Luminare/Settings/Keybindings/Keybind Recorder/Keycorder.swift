@@ -132,20 +132,35 @@ struct Keycorder: View {
         /// Get current selected keys that aren't modifiers
         let currentKeys = selectionKeybind + [event.keyCode]
             .filter { !$0.isModifier }
+            .map(\.baseKey)
 
-        /// Get current modifiers that aren't trigger keys
-        let currentModifiers = event.modifierFlags
-            .convertToCGKeyCode()
-            .filter {
-                !Defaults[.triggerKey]
-                    .map(\.baseModifier)
-                    .contains($0)
-            }
+        /// Get current modifiers that are actually pressed
+        let modifierMapping: [(NSEvent.ModifierFlags, CGKeyCode)] = [
+            (.command, .kVK_Command),
+            (.option, .kVK_Option),
+            (.control, .kVK_Control),
+            (.shift, .kVK_Shift),
+            (.function, .kVK_Function)
+        ]
 
-        let newSelection = Set(currentKeys + currentModifiers)
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let currentModifiers = Set(
+            modifierMapping
+                .filter { flags.contains($0.0) && $0.1.isPressed }
+                .map(\.1)
+        )
+
+        // Filter out trigger keys
+        let validModifiers = currentModifiers.filter {
+            !Defaults[.triggerKey]
+                .map(\.baseModifier)
+                .contains($0)
+        }
+
+        let finalKeys = Set(currentKeys + validModifiers)
 
         /// Make sure we don't go over the key limit
-        guard newSelection.count < keyLimit else {
+        guard finalKeys.count < keyLimit else {
             errorMessage = "You can only use up to \(keyLimit) keys in a keybind, including the trigger key."
             shouldShake.toggle()
             shouldError = true
@@ -153,7 +168,7 @@ struct Keycorder: View {
         }
 
         shouldError = false
-        selectionKeybind = newSelection
+        selectionKeybind = finalKeys
     }
 
     func finishedObservingKeys(wasForced: Bool = false) {
