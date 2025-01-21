@@ -48,7 +48,14 @@ class Updater: ObservableObject {
         }
     }
 
-    @Published var updatesEnabled: Bool = Defaults[.updatesEnabled] {
+    @Published var updatesEnabled: Bool = {
+        // Check environment variable first
+        if ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"] != nil {
+            return false
+        }
+        // Fall back to defaults
+        return Defaults[.updatesEnabled]
+    }() {
         didSet {
             Defaults[.updatesEnabled] = updatesEnabled
             if updatesEnabled {
@@ -62,8 +69,8 @@ class Updater: ObservableObject {
     }
 
     init() {
-        // Only set up the timer if updates are enabled
-        if updatesEnabled {
+        // Only set up the timer if updates are enabled and env var is not set
+        if updatesEnabled, ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"] == nil {
             self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
                 .autoconnect()
                 .sink { _ in
