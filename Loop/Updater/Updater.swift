@@ -10,7 +10,7 @@ import Defaults
 import Luminare
 import SwiftUI
 
-class Updater: ObservableObject {
+final class Updater: ObservableObject {
     @Published var targetRelease: Release?
     @Published var progressBar: Double = 0
     @Published var updateState: UpdateAvailability = .notChecked
@@ -48,29 +48,17 @@ class Updater: ObservableObject {
         }
     }
 
-    @Published var updatesEnabled: Bool = {
-        // Check environment variable first
-        if ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"] != nil {
-            return false
-        }
-        // Fall back to defaults
-        return Defaults[.updatesEnabled]
-    }() {
+    @Published var updatesEnabled: Bool {
         didSet {
-            Defaults[.updatesEnabled] = updatesEnabled
-            if updatesEnabled {
-                Task {
-                    await fetchLatestInfo()
-                }
-            } else {
-                updateState = .disabled
-            }
+            handleUpdatesEnabledChange()
         }
     }
 
     init() {
+        self.updatesEnabled = Self.initialUpdatesEnabled()
+
         // Only set up the timer if updates are enabled and env var is not set
-        if updatesEnabled, ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"] == nil {
+        if updatesEnabled {
             self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
                 .autoconnect()
                 .sink { _ in
@@ -84,6 +72,25 @@ class Updater: ObservableObject {
                 }
         } else {
             self.updateState = .disabled
+        }
+    }
+
+    private static func initialUpdatesEnabled() -> Bool {
+        if let env = ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"],
+           env == "1" || env.lowercased() == "true" {
+            return false
+        }
+        return Defaults[.updatesEnabled]
+    }
+
+    private func handleUpdatesEnabledChange() {
+        Defaults[.updatesEnabled] = updatesEnabled
+        if updatesEnabled {
+            Task {
+                await fetchLatestInfo()
+            }
+        } else {
+            updateState = .disabled
         }
     }
 

@@ -192,24 +192,29 @@ struct AboutConfigurationView: View {
                         let currentTitle = model.updateButtonTitle
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             if model.updateButtonTitle == currentTitle {
-                                model.updateButtonTitle = .init(localized: "Check for updates…")
+                                if updater.updatesEnabled {
+                                    model.updateButtonTitle = .init(localized: "Check for updates…")
+                                } else {
+                                    model.updateButtonTitle = .init(localized: "Updates are disabled")
+                                }
                             }
                         }
                     }
                 }
             } label: {
-                Text(model.updateButtonTitle)
+                Text(.init(model.updateButtonTitle))
                     .contentTransition(.numericText())
                     .animation(LuminareConstants.animation, value: model.updateButtonTitle)
             }
             .disabled(!updateButtonEnabled)
             .onHover { hovering in
                 isHoveringOverUpdateButton = hovering
+
                 if !updater.updatesEnabled {
-                    withAnimation(LuminareConstants.animation) {
-                        model.updateButtonTitle = hovering ?
-                            .init(localized: "Check for updates…") :
-                            .init(localized: "Updates are disabled")
+                    if hovering {
+                        model.updateButtonTitle = "`sudo upgrade loop`"
+                    } else {
+                        model.updateButtonTitle = .init(localized: "Updates are disabled")
                     }
                 }
             }
@@ -226,12 +231,10 @@ struct AboutConfigurationView: View {
                 }
             }
             .onChange(of: updater.updatesEnabled) { enabled in
-                withAnimation(LuminareConstants.animation) {
-                    if !enabled {
-                        model.updateButtonTitle = .init(localized: "Updates are disabled")
-                    } else {
-                        model.updateButtonTitle = .init(localized: "Check for updates…")
-                    }
+                if !enabled {
+                    model.updateButtonTitle = .init(localized: "Updates are disabled")
+                } else {
+                    model.updateButtonTitle = .init(localized: "Check for updates…")
                 }
             }
 
