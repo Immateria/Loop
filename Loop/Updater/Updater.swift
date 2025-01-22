@@ -14,7 +14,6 @@ final class Updater: ObservableObject {
     @Published var targetRelease: Release?
     @Published var progressBar: Double = 0
     @Published var updateState: UpdateAvailability = .notChecked
-    @Published var updateCheckDisabledMessage: String?
 
     @Published var changelog: [(title: String, body: [ChangelogNote])] = .init()
 
@@ -107,7 +106,6 @@ final class Updater: ObservableObject {
             await MainActor.run {
                 targetRelease = nil
                 updateState = .disabled
-                updateCheckDisabledMessage = String(localized: "Updates are currently disabled via defaults")
             }
             return
         }
@@ -116,7 +114,6 @@ final class Updater: ObservableObject {
             targetRelease = nil
             updateState = .notChecked
             progressBar = 0
-            updateCheckDisabledMessage = nil
         }
 
         let urlString = includeDevelopmentVersions ?
