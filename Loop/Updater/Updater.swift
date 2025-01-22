@@ -10,7 +10,7 @@ import Defaults
 import Luminare
 import SwiftUI
 
-class Updater: ObservableObject {
+final class Updater: ObservableObject {
     @Published var targetRelease: Release?
     @Published var progressBar: Double = 0
     @Published var updateState: UpdateAvailability = .notChecked
@@ -30,6 +30,7 @@ class Updater: ObservableObject {
         case notChecked
         case available
         case unavailable
+        case disabled
     }
 
     private var windowController: NSWindowController?
@@ -46,18 +47,50 @@ class Updater: ObservableObject {
         }
     }
 
-    init() {
-        self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
-            .autoconnect()
-            .sink { _ in
-                Task {
-                    await self.fetchLatestInfo()
+    @Published var updatesEnabled: Bool {
+        didSet {
+            handleUpdatesEnabledChange()
+        }
+    }
 
-                    if self.updateState == .available {
-                        await self.showUpdateWindow()
+    init() {
+        self.updatesEnabled = Self.initialUpdatesEnabled()
+
+        // Only set up the timer if updates are enabled and env var is not set
+        if updatesEnabled {
+            self.updateCheckCancellable = Timer.publish(every: 21600, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    Task {
+                        await self.fetchLatestInfo()
+
+                        if self.updateState == .available {
+                            await self.showUpdateWindow()
+                        }
                     }
                 }
+        } else {
+            self.updateState = .disabled
+        }
+    }
+
+    private static func initialUpdatesEnabled() -> Bool {
+        if let env = ProcessInfo.processInfo.environment["LOOP_SKIP_UPDATE_CHECK"],
+           env == "1" || env.lowercased() == "true" {
+            return false
+        }
+        return Defaults[.updatesEnabled]
+    }
+
+    private func handleUpdatesEnabledChange() {
+        Defaults[.updatesEnabled] = updatesEnabled
+        if updatesEnabled {
+            Task {
+                await fetchLatestInfo()
             }
+        } else {
+            updateState = .disabled
+        }
     }
 
     func dismissWindow() {
@@ -67,7 +100,16 @@ class Updater: ObservableObject {
     }
 
     // Pulls the latest release information from GitHub and updates the app state accordingly.
-    func fetchLatestInfo() async {
+    func fetchLatestInfo(force: Bool = false) async {
+        // Early return if updates are disabled and not forcing
+        guard updatesEnabled || force else {
+            await MainActor.run {
+                targetRelease = nil
+                updateState = .disabled
+            }
+            return
+        }
+
         await MainActor.run {
             targetRelease = nil
             updateState = .notChecked

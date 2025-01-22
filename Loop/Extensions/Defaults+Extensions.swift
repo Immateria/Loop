@@ -98,6 +98,9 @@ extension Defaults.Keys {
 
     // About
     static let includeDevelopmentVersions = Key<Bool>("includeDevelopmentVersions", default: false, iCloud: true)
+    /// Disable automatic updates with `defaults write com.MrKai77.Loop updatesEnabled -bool false`
+    /// Reset with `defaults delete com.MrKai77.Loop updatesEnabled`
+    static let updatesEnabled = Key<Bool>("updatesEnabled", default: true, iCloud: true)
 
     static let excludedApps = Key<[URL]>("excludedApps", default: [], iCloud: true)
     static let sizeIncrement = Key<CGFloat>("sizeIncrement", default: 20, iCloud: true)

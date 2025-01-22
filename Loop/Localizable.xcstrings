@@ -21265,6 +21265,9 @@
         }
       }
     },
+    "Updates are disabled" : {
+
+    },
     "Use coordinates" : {
       "extractionState" : "manual",
       "localizations" : {
