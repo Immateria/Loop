@@ -27,11 +27,6 @@ enum WindowEngine {
         let windowTitle = window.nsRunningApplication?.localizedName ?? window.title ?? "<unknown>"
         print("Resizing \(windowTitle) to \(action.direction) on \(screen.localizedName)")
 
-        // Note that this is only really useful when "Resize window under cursor" is enabled
-        if Defaults[.focusWindowOnResize] {
-            window.activate()
-        }
-
         // If the action is to hide or minimize, perform the action then return
         if action.direction == .hide {
             window.toggleHidden()
@@ -41,6 +36,11 @@ enum WindowEngine {
         if action.direction == .minimize {
             window.toggleMinimized()
             return
+        }
+
+        // Note that this is only really useful when "Resize window under cursor" is enabled
+        if Defaults[.focusWindowOnResize] {
+            window.activate()
         }
 
         if shouldRecord {
